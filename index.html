@@ -592,17 +592,22 @@ REPLACE THE ENTIRE GOAL MODAL (starts around line 384) WITH THIS:
             </div>
         </div>
     </div>
-
-
+ 
+     <!-- Configuration - MUST BE FIRST -->
+        <script src="config.js"></script>
+        
+        <!-- Demo Data & localStorage Adapter - MUST BE SECOND -->
+        <script src="demo-data.js"></script>
+        
+        <!-- Chart.js for Analytics -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
     
     <!-- Chart.js Library -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
     
     <!-- JavaScript Modules -->
-    <script src="js/config.js"></script>
     <script src="js/state.js"></script>
     <script src="js/utils.js"></script>
-    <script src="js/supabase.js"></script>
     <script src="js/habits.js"></script>
     <script src="js/tasks.js"></script>
     <script src="js/goals.js"></script>
