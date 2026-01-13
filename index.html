@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Productivity Hub - Track habits, tasks, goals, and analyze your productivity">
+    <meta name="theme-color" content="#3B82F6">
+    <title>Productivity Hub</title>
+    
+    <!-- CDN Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        danger: '#EF4444',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-gray-50">
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+    
+    <!-- App Container -->
+    <div id="app" class="max-w-md mx-auto h-screen flex flex-col bg-white shadow-lg">
+        
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-check-circle text-primary text-2xl"></i>
+                <h1 class="text-xl font-bold text-gray-800">Productivity Hub</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="openCategoryModal()" class="text-gray-600 hover:text-primary transition" title="Manage Categories">
+                    <i class="fas fa-folder text-xl"></i>
+                </button>
+                <div id="connection-status" class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-gray-300" id="status-dot"></div>
+                    <span class="text-xs text-gray-500" id="status-text">Connecting...</span>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto bg-gray-50" style="padding-bottom: 110px;">
+            
+            <!-- Loading Screen (Initial) -->
+            <div id="loading-screen" class="h-full flex flex-col items-center justify-center gap-4">
+                <div class="spinner"></div>
+                <p class="text-gray-600">Loading your productivity data...</p>
+            </div>
+            
+            <!-- PANEL 1: HABITS -->
+            <div id="habits-panel" class="panel hidden p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">Habits</h2>
+                    <button onclick="openHabitModal()" class="touch-target bg-primary text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:bg-blue-600 transition">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                
+                <div class="mb-3 text-center">
+                    <p class="text-sm text-gray-500" id="current-date">Today</p>
+                </div>
+                
+                <div id="habits-list" class="space-y-2">
+                    <div class="text-center text-gray-500 py-8">
+                        <i class="fas fa-list-check text-4xl mb-2"></i>
+                        <p>Your habits will appear here</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PANEL 2: TASKS -->
+            <div id="tasks-panel" class="panel hidden p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">To-Do List</h2>
+                    <button onclick="openTaskModal()" class="touch-target bg-primary text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:bg-blue-600 transition">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                
+                <!-- Task View Filters -->
+                <div class="flex gap-2 mb-4 overflow-x-auto pb-2">
+                    <button class="filter-btn active" data-view="all" onclick="switchTaskView('all')">
+                        All <span id="count-all" class="ml-1">0</span>
+                    </button>
+                    <button class="filter-btn" data-view="overdue" onclick="switchTaskView('overdue')">
+                        Overdue <span id="count-overdue" class="ml-1">0</span>
+                    </button>
+                    <button class="filter-btn" data-view="upcoming" onclick="switchTaskView('upcoming')">
+                        Upcoming <span id="count-upcoming" class="ml-1">0</span>
+                    </button>
+                    <button class="filter-btn" data-view="completed" onclick="switchTaskView('completed')">
+                        Completed <span id="count-completed" class="ml-1">0</span>
+                    </button>
+                </div>
+                
+                <!-- Search Bar -->
+                <div class="mb-4">
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input 
+                            type="text" 
+                            id="task-search"
+                            placeholder="Search tasks..."
+                            class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                            oninput="filterTasks()"
+                        >
+                    </div>
+                </div>
+                
+                <!-- Category & Goal Filters -->
+                <div class="mb-4 flex gap-2 overflow-x-auto pb-2">
+                    <select 
+                        id="filter-category" 
+                        class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                        onchange="filterTasks()"
+                    >
+                        <option value="">All Categories</option>
+                    </select>
+                    <select 
+                        id="filter-goal" 
+                        class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                        onchange="filterTasks()"
+                    >
+                        <option value="">All Goals</option>
+                    </select>
+                </div>
+                
+                <!-- Tasks List -->
+                <div id="tasks-list" class="space-y-2">
+                    <div class="text-center text-gray-500 py-8">
+                        <i class="fas fa-tasks text-4xl mb-2"></i>
+                        <p>Your tasks will appear here</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PANEL 3: GOALS -->
+            <div id="goals-panel" class="panel hidden p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">Goals</h2>
+                    <button onclick="openGoalModal()" class="touch-target bg-primary text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:bg-blue-600 transition">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                
+                <div id="goals-list" class="space-y-1.5">
+                    <div class="text-center text-gray-500 py-8">
+                        <i class="fas fa-bullseye text-4xl mb-2"></i>
+                        <p>Your goals will appear here</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PANEL 4: CALENDAR -->
+            <div id="calendar-panel" class="panel hidden p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">Calendar</h2>
+                </div>
+                
+                <div id="calendar-view" class="text-center text-gray-500 py-8">
+                    <i class="fas fa-calendar text-4xl mb-2"></i>
+                    <p>Calendar view coming soon</p>
+                </div>
+            </div>
+
+            <!-- PANEL 5: ANALYTICS -->
+            <div id="analytics-panel" class="panel hidden p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">Analytics</h2>
+                </div>
+                
+                <!-- Time Period Selector -->
+                <div class="mb-4">
+                    <div class="flex gap-2 overflow-x-auto pb-2">
+                        <button class="period-btn active" data-period="7" onclick="switchPeriod(7)">
+                            <span class="text-sm font-semibold">7 Days</span>
+                        </button>
+                        <button class="period-btn" data-period="30" onclick="switchPeriod(30)">
+                            <span class="text-sm font-semibold">30 Days</span>
+                        </button>
+                        <button class="period-btn" data-period="90" onclick="switchPeriod(90)">
+                            <span class="text-sm font-semibold">90 Days</span>
+                        </button>
+                        <button class="period-btn" data-period="all" onclick="switchPeriod('all')">
+                            <span class="text-sm font-semibold">All Time</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Productivity Insights Section -->
+                <div class="mb-4 bg-gray-50 rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-2 cursor-pointer" onclick="toggleSection('insights')">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <i class="fas fa-lightbulb text-yellow-500"></i>
+                            Insights
+                        </h3>
+                        <i id="insights-collapse-icon" class="fas fa-chevron-up text-gray-500 transition-transform"></i>
+                    </div>
+                    <div id="insights-analytics-content">
+                        <div id="insights-content"></div>
+                    </div>
+                </div>
+                
+                <!-- Habit Analytics -->
+                <div class="mb-4 bg-gray-50 rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-2 cursor-pointer" onclick="toggleSection('habits')">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <i class="fas fa-list-check text-success"></i>
+                            Habits
+                        </h3>
+                        <i id="habits-collapse-icon" class="fas fa-chevron-up text-gray-500 transition-transform"></i>
+                    </div>
+                    <div id="habits-analytics-content">
+                        <div id="habit-summary-cards"></div>
+                        <div id="habit-charts"></div>
+                    </div>
+                </div>
+                
+                <!-- Task Analytics -->
+                <div class="mb-4 bg-gray-50 rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-2 cursor-pointer" onclick="toggleSection('tasks')">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <i class="fas fa-tasks text-purple-500"></i>
+                            Tasks
+                        </h3>
+                        <i id="tasks-collapse-icon" class="fas fa-chevron-up text-gray-500 transition-transform"></i>
+                    </div>
+                    <div id="tasks-analytics-content">
+                        <div id="task-summary-cards"></div>
+                        <div id="task-charts"></div>
+                    </div>
+                </div>
+                
+                <!-- Goal Analytics -->
+                <div class="mb-4 bg-gray-50 rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-2 cursor-pointer" onclick="toggleSection('goals')">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <i class="fas fa-bullseye text-primary"></i>
+                            Goals
+                        </h3>
+                        <i id="goals-collapse-icon" class="fas fa-chevron-up text-gray-500 transition-transform"></i>
+                    </div>
+                    <div id="goals-analytics-content">
+                        <div id="goal-summary-cards"></div>
+                        <div id="goal-charts"></div>
+                    </div>
+                </div>
+            </div>
+
+            
+            
+        </main>
+        
+        <!-- Bottom Navigation -->    
+        <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 flex items-center justify-around" style="z-index: 9999; padding-bottom: max(0.5rem, env(safe-area-inset-bottom));">
+            <div class="flex justify-around items-center">
+                <button class="nav-btn active" data-panel="habits" onclick="switchPanel('habits')">
+                    <i class="fas fa-list-check"></i>
+                    <span>Habits</span>
+                </button>
+                <button class="nav-btn" data-panel="tasks" onclick="switchPanel('tasks')">
+                    <i class="fas fa-tasks"></i>
+                    <span>Tasks</span>
+                </button>
+                <button class="nav-btn" data-panel="goals" onclick="switchPanel('goals')">
+                    <i class="fas fa-bullseye"></i>
+                    <span>Goals</span>
+                </button>
+                <button class="nav-btn" data-panel="calendar" onclick="switchPanel('calendar')">
+                    <i class="fas fa-calendar"></i>
+                    <span>Calendar</span>
+                </button>
+                <button class="nav-btn" data-panel="analytics" onclick="switchPanel('analytics')">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Analytics</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+    
+    <!-- Habit Modal -->
+    <div id="habit-modal" class="modal hidden" onclick="closeModalOnBackdrop(event, 'habit-modal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800" id="habit-modal-title">Add Habit</h3>
+                    <button onclick="closeHabitModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+                
+                <form id="habit-form" onsubmit="saveHabit(event)">
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Icon (optional)</label>
+                        <div class="flex items-center gap-3 mb-2">
+                            <div id="selected-emoji" class="text-4xl w-14 h-14 flex items-center justify-center border-2 border-gray-300 rounded-lg no-emoji"></div>
+                            <button type="button" onclick="toggleEmojiPicker()" class="px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-blue-600 transition">
+                                <i class="fas fa-icons mr-2"></i>Choose Icon
+                            </button>
+                            <button type="button" onclick="clearEmoji()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300 transition">
+                                <i class="fas fa-times mr-1"></i>Remove
+                            </button>
+                        </div>
+                        <div id="emoji-picker" class="hidden mt-2 p-3 border border-gray-300 rounded-lg bg-gray-50">
+                            <div class="emoji-picker-container custom-scrollbar" id="emoji-categories"></div>
+                        </div>
+                        <input type="hidden" id="habit-emoji" value="">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Habit Name</label>
+                        <input type="text" id="habit-name" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="e.g., Morning Meditation">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Frequency</label>
+                        <select id="habit-frequency" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none">
+                            <option value="daily">Daily (every day)</option>
+                            <option value="weekly">Weekly (X times per week)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4" id="weekly-target-container" style="display: none;">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            How many days per week?
+                            <span class="text-xs text-gray-500 block mt-1">Example: "Go to gym 3 times per week"</span>
+                        </label>
+                        <input type="number" id="habit-weekly-target" min="1" max="7" value="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none">
+                    </div>
+                    
+                    <div class="mb-6">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" id="habit-exempt-weekends" class="w-5 h-5 text-primary focus:ring-2 focus:ring-primary rounded">
+                            <span class="text-sm text-gray-700">Skip on weekends</span>
+                        </label>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button type="button" onclick="closeHabitModal()" class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition">Cancel</button>
+                        <button type="submit" class="flex-1 px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-blue-600 transition">Save</button>
+                    </div>
+                    
+                    <button type="button" id="delete-habit-btn" onclick="deleteHabit()" class="hidden w-full mt-3 px-6 py-3 bg-danger text-white rounded-lg font-semibold hover:bg-red-600 transition">Delete Habit</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Task Modal -->
+    <div id="task-modal" class="modal hidden" onclick="closeModalOnBackdrop(event, 'task-modal')">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800" id="task-modal-title">Add Task</h3>
+                    <button onclick="closeTaskModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+                
+                <form id="task-form" onsubmit="saveTask(event)">
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Task Title</label>
+                        <input type="text" id="task-title" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="e.g., Finish project proposal">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Notes (optional)</label>
+                        <textarea id="task-notes" rows="6" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="Add details..." style="min-height: 120px;"></textarea>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Category</label>
+                        <select id="task-category" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none">
+                            <option value="">No category</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Link to Goal (optional)</label>
+                        <select id="task-goal" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none">
+                            <option value="">No goal</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Due Date (optional)</label>
+                        <input type="date" id="task-due-date" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center gap-3 cursor-pointer mb-2">
+                            <input type="checkbox" id="task-is-recurring" class="w-5 h-5 text-primary focus:ring-2 focus:ring-primary rounded" onchange="toggleRecurringOptions()">
+                            <span class="text-sm font-semibold text-gray-700">Recurring task</span>
+                        </label>
+                    </div>
+                    
+                    <div id="recurring-options" class="hidden mb-4 p-4 bg-gray-50 rounded-lg">
+                        <div class="mb-3">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Repeat</label>
+                            <select id="task-recurrence-type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" onchange="updateRecurringFields()">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Every <span id="interval-label">day(s)</span></label>
+                            <input type="number" id="task-recurrence-interval" min="1" value="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none">
+                        </div>
+                        
+                        <div id="day-of-week-container" class="hidden mb-3">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">On day</label>
+                            <select id="task-recurrence-day" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none">
+                                <option value="0">Sunday</option>
+                                <option value="1">Monday</option>
+                                <option value="2">Tuesday</option>
+                                <option value="3">Wednesday</option>
+                                <option value="4">Thursday</option>
+                                <option value="5">Friday</option>
+                                <option value="6">Saturday</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Ends on (optional)</label>
+                            <input type="date" id="task-recurrence-ends" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none">
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button type="button" onclick="closeTaskModal()" class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition">Cancel</button>
+                        <button type="submit" class="flex-1 px-6 py-3 bg-primary text-white rounded-lg font-semibold hover:bg-blue-600 transition">Save</button>
+                    </div>
+                    
+                    <button type="button" id="delete-task-btn" onclick="deleteTask()" class="hidden w-full mt-3 px-6 py-3 bg-danger text-white rounded-lg font-semibold hover:bg-red-600 transition">Delete Task</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+REPLACE THE ENTIRE GOAL MODAL (starts around line 384) WITH THIS:
+
+<!-- Goal Modal -->
+<div id="goal-modal" class="modal hidden" onclick="closeModalOnBackdrop(event, 'goal-modal')">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="p-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-800" id="goal-modal-title">Add Goal</h3>
+                <button onclick="closeGoalModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <form id="goal-form" onsubmit="saveGoal(event)">
+                <!-- Emoji Picker -->
+                <div class="mb-3">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Icon (optional)</label>
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <div id="selected-goal-emoji" class="text-3xl w-12 h-12 flex items-center justify-center border-2 border-gray-300 rounded-lg no-emoji"></div>
+                        <button type="button" onclick="toggleGoalEmojiPicker()" class="px-3 py-2 bg-primary text-white rounded-lg text-sm hover:bg-blue-600 transition">
+                            <i class="fas fa-icons mr-1.5"></i>Choose
+                        </button>
+                        <button type="button" onclick="clearGoalEmoji()" class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300 transition">
+                            <i class="fas fa-times mr-1"></i>Clear
+                        </button>
+                    </div>
+                    <div id="goal-emoji-picker" class="hidden mt-1.5 p-2 border border-gray-300 rounded-lg bg-gray-50 max-h-48 overflow-y-auto custom-scrollbar">
+                        <div id="goal-emoji-categories"></div>
+                    </div>
+                    <input type="hidden" id="goal-emoji" value="">
+                </div>
+                
+                <!-- Goal Name -->
+                <div class="mb-3">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Goal Name</label>
+                    <input type="text" id="goal-name" required class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="e.g., Learn Spanish">
+                </div>
+                
+                <!-- Description -->
+                <div class="mb-3">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Description (optional)</label>
+                    <textarea id="goal-description" rows="2" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="Add details..."></textarea>
+                </div>
+                
+            
+                <!-- Category -->
+                <div class="mb-3">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Category</label>
+                    <select id="goal-category" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none">
+                        <option value="">No category</option>
+                    </select>
+                </div>
+                
+                <!-- Target Date -->
+                <div class="mb-3">
+                    <label class="block text-sm font-semibold text-gray-700 mb-1.5">Target Date (optional)</label>
+                    <input type="date" id="goal-due-date" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none">
+                </div>
+                
+                <!-- Linked Tasks (shown in edit mode) -->
+                <div id="goal-task-info" class="mb-3"></div>
+                
+                <!-- Action Buttons -->
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeGoalModal()" class="flex-1 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 text-sm bg-primary text-white rounded-lg font-semibold hover:bg-blue-600 transition">Save</button>
+                </div>
+                
+                <button type="button" id="delete-goal-btn" onclick="deleteGoal()" class="hidden w-full mt-2 px-4 py-2 text-sm bg-danger text-white rounded-lg font-semibold hover:bg-red-600 transition">Delete Goal</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+    <!-- Category Management Modal -->
+    <div id="category-modal" class="modal hidden" onclick="event.target.id === 'category-modal' && closeCategoryModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">Manage Categories</h3>
+                    <button onclick="closeCategoryModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="category-form" onsubmit="saveCategory(event)">
+                    <!-- Category Name -->
+                    <div class="mb-3">
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Category Name*</label>
+                        <input type="text" id="category-name" required class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none" placeholder="e.g., Work">
+                    </div>
+                    
+                    <!-- Color Picker -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Color</label>
+                        <div id="color-picker" class="flex flex-wrap gap-2"></div>
+                    </div>
+                    
+                    <!-- Save Button -->
+                    <button type="submit" class="w-full px-4 py-2 text-sm bg-primary text-white rounded-lg font-semibold hover:bg-blue-600 transition mb-4">
+                        Save Category
+                    </button>
+                </form>
+                
+                <!-- Divider -->
+                <div class="border-t border-gray-200 my-4"></div>
+                
+                <!-- Category List -->
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Your Categories:</h4>
+                    <div id="category-list" class="space-y-1 max-h-64 overflow-y-auto custom-scrollbar"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar Detail Modal -->
+    <div id="calendar-detail-modal" class="modal hidden" onclick="event.target.id === 'calendar-detail-modal' && closeCalendarDetailModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-gray-800" id="calendar-detail-date">Date Details</h3>
+                    <button onclick="closeCalendarDetailModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div id="calendar-detail-content" class="max-h-96 overflow-y-auto custom-scrollbar">
+                    <!-- Content populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    
+    <!-- JavaScript Modules -->
+    <script src="js/config.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/supabase.js"></script>
+    <script src="js/habits.js"></script>
+    <script src="js/tasks.js"></script>
+    <script src="js/goals.js"></script>
+    <script src="js/categories.js"></script>
+    <script src="js/calendar.js"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
