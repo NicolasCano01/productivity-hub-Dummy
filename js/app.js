@@ -3,25 +3,7 @@
 // ============================================
 
 // Main app initialization function
-async function initApp() {
-    console.log('🚀 Initializing Productivity Hub...');
-    
-    // Step 1: Initialize Supabase
-    const supabaseReady = await initializeSupabase();
-    if (!supabaseReady) {
-        hideLoadingScreen();
-        document.getElementById('habits-panel').innerHTML = `
-            <div class="text-center text-danger py-8">
-                <i class="fas fa-exclamation-triangle text-4xl mb-2"></i>
-                <p class="font-bold">Failed to connect to database</p>
-                <p class="text-sm mt-2">Please check your internet connection</p>
-                <button onclick="location.reload()" class="mt-4 px-6 py-2 bg-primary text-white rounded-lg">
-                    Retry
-                </button>
-            </div>
-        `;
-        return;
-    }
+
     
     // Step 2: Fetch initial data
     const dataLoaded = await fetchInitialData();
