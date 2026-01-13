@@ -4,6 +4,13 @@
 
 // Initialize Supabase Client
 async function initializeSupabase() {
+    // Skip Supabase initialization if in demo mode
+    if (typeof DEMO_MODE !== 'undefined' && DEMO_MODE) {
+        console.log('🎮 Demo mode enabled - skipping Supabase connection');
+        updateConnectionStatus(true);
+        return true;
+    }
+    
     try {
         console.log('🔌 Connecting to Supabase...');
         

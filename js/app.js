@@ -3,7 +3,54 @@
 // ============================================
 
 // Main app initialization function
-
+async function initApp() {
+    console.log('🚀 Initializing Productivity Hub...');
+    
+    // Check if running in demo mode
+    if (typeof DEMO_MODE !== 'undefined' && DEMO_MODE) {
+        console.log('🎮 Running in DEMO MODE');
+        
+        // Initialize demo data
+        ensureDemoData();
+        
+        // Simulate fetching from localStorage
+        await fetchInitialData();
+        
+        // Render initial views
+        renderHabits();
+        renderTasks();
+        renderGoals();
+        
+        // Hide loading screen
+        hideLoadingScreen();
+        
+        // Show success message
+        showToast('🎮 Demo Mode - All features available!', 'success');
+        
+        console.log('✅ Demo app initialization complete!');
+        console.log('📊 App State:', appState);
+        return;
+    }
+    
+    // PRODUCTION MODE - Connect to Supabase
+    console.log('🔌 Connecting to Supabase...');
+    
+    // Step 1: Initialize Supabase
+    const supabaseReady = await initializeSupabase();
+    if (!supabaseReady) {
+        hideLoadingScreen();
+        document.getElementById('habits-panel').innerHTML = `
+            <div class="text-center text-danger py-8">
+                <i class="fas fa-exclamation-triangle text-4xl mb-2"></i>
+                <p class="font-bold">Failed to connect to database</p>
+                <p class="text-sm mt-2">Please check your internet connection</p>
+                <button onclick="location.reload()" class="mt-4 px-6 py-2 bg-primary text-white rounded-lg">
+                    Retry
+                </button>
+            </div>
+        `;
+        return;
+    }
     
     // Step 2: Fetch initial data
     const dataLoaded = await fetchInitialData();
@@ -57,5 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initApp);
 } else {
-    initApp();
+    // Wrap in setTimeout to ensure all scripts are loaded
+    setTimeout(initApp, 0);
 }
