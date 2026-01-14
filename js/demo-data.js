@@ -186,124 +186,267 @@ function generateDemoData() {
 // LOCALSTORAGE ADAPTER - Mimics Supabase API
 // ============================================
 
+// ============================================
+// LOCALSTORAGE ADAPTER - Mimics Supabase API with Full Chaining
+// ============================================
+
 const demoSupabase = {
     from: function(table) {
-        return {
+        // Create a query builder that supports full chaining
+        const queryBuilder = {
+            _table: table,
+            _columns: '*',
+            _filters: [],
+            _orderColumn: null,
+            _orderOptions: {},
+            _limitCount: null,
+            
             select: function(columns = '*') {
-                return {
-                    eq: function(column, value) {
-                        return this.executeSelect(table, columns, [{ column, operator: '=', value }]);
-                    },
-                    order: function(column, options = {}) {
-                        this.orderColumn = column;
-                        this.orderOptions = options;
-                        return this;
-                    },
-                    limit: function(count) {
-                        this.limitCount = count;
-                        return this;
-                    },
-                    single: async function() {
-                        const result = await this.executeSelect(table, columns, this.filters || []);
-                        if (result.data && result.data.length > 0) {
-                            return { data: result.data[0], error: null };
-                        }
-                        return { data: null, error: { message: 'No rows found' } };
-                    },
-                    executeSelect: async function(table, columns, filters = []) {
-                        ensureDemoData();
-                        let data = JSON.parse(localStorage.getItem(`demo_${table}`) || '[]');
-                        
-                        // Apply filters
-                        filters.forEach(filter => {
-                            data = data.filter(row => {
-                                if (filter.operator === '=') {
-                                    return row[filter.column] === filter.value;
-                                }
-                                return true;
-                            });
-                        });
-                        
-                        // Apply ordering
-                        if (this.orderColumn) {
-                            data.sort((a, b) => {
-                                const aVal = a[this.orderColumn];
-                                const bVal = b[this.orderColumn];
-                                if (this.orderOptions.nullsFirst === false) {
-                                    if (aVal === null) return 1;
-                                    if (bVal === null) return -1;
-                                }
-                                if (aVal < bVal) return -1;
-                                if (aVal > bVal) return 1;
-                                return 0;
-                            });
-                        }
-                        
-                        // Apply limit
-                        if (this.limitCount) {
-                            data = data.slice(0, this.limitCount);
-                        }
-                        
-                        return { data, error: null };
-                    },
-                    then: function(callback) {
-                        return this.executeSelect(table, columns, []).then(callback);
-                    }
-                };
+                this._columns = columns;
+                return this;
             },
-            insert: function(records) {
-                return {
-                    select: function() {
-                        return this;
-                    },
-                    single: async function() {
-                        ensureDemoData();
-                        const data = JSON.parse(localStorage.getItem(`demo_${table}`) || '[]');
-                        const record = Array.isArray(records) ? records[0] : records;
-                        
-                        // Generate ID if not provided
-                        if (!record.id) {
-                            record.id = `${table}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                        }
-                        
-                        data.push(record);
-                        localStorage.setItem(`demo_${table}`, JSON.stringify(data));
-                        
-                        return { data: record, error: null };
-                    }
-                };
+            
+            eq: function(column, value) {
+                this._filters.push({ column, operator: '=', value });
+                return this;
             },
-            update: function(updates) {
-                return {
-                    eq: async function(column, value) {
-                        ensureDemoData();
-                        const data = JSON.parse(localStorage.getItem(`demo_${table}`) || '[]');
-                        const index = data.findIndex(row => row[column] === value);
-                        
-                        if (index !== -1) {
-                            data[index] = { ...data[index], ...updates };
-                            localStorage.setItem(`demo_${table}`, JSON.stringify(data));
-                            return { data: data[index], error: null };
-                        }
-                        
-                        return { data: null, error: { message: 'No rows found' } };
-                    }
-                };
+            
+            order: function(column, options = {}) {
+                this._orderColumn = column;
+                this._orderOptions = options;
+                return this;
             },
-            delete: function() {
-                return {
-                    eq: async function(column, value) {
-                        ensureDemoData();
-                        let data = JSON.parse(localStorage.getItem(`demo_${table}`) || '[]');
-                        data = data.filter(row => row[column] !== value);
-                        localStorage.setItem(`demo_${table}`, JSON.stringify(data));
-                        
-                        return { data: null, error: null };
+            
+            limit: function(count) {
+                this._limitCount = count;
+                return this;
+            },
+            
+            single: async function() {
+                const result = await this._execute();
+                if (result.data && result.data.length > 0) {
+                    return { data: result.data[0], error: null };
+                }
+                return { data: null, error: { message: 'No rows found' } };
+            },
+            
+            then: function(callback) {
+                return this._execute().then(callback);
+            },
+            
+            _execute: async function() {
+                ensureDemoData();
+                let data = JSON.parse(localStorage.getItem(`demo_${this._table}`) || '[]');
+                
+                // Apply filters
+                this._filters.forEach(filter => {
+                    if (filter.operator === '=') {
+                        data = data.filter(row => row[filter.column] === filter.value);
                     }
-                };
+                });
+                
+                // Apply ordering
+                if (this._orderColumn) {
+                    const column = this._orderColumn;
+                    const nullsFirst = this._orderOptions.nullsFirst !== false;
+                    
+                    data.sort((a, b) => {
+                        const aVal = a[column];
+                        const bVal = b[column];
+                        
+                        // Handle nulls
+                        if (aVal === null || aVal === undefined) return nullsFirst ? -1 : 1;
+                        if (bVal === null || bVal === undefined) return nullsFirst ? 1 : -1;
+                        
+                        // Compare values
+                        if (aVal < bVal) return -1;
+                        if (aVal > bVal) return 1;
+                        return 0;
+                    });
+                }
+                
+                // Apply limit
+                if (this._limitCount) {
+                    data = data.slice(0, this._limitCount);
+                }
+                
+                return { data, error: null };
+            }
+        };
+        
+        return queryBuilder;
+    },
+    
+    insert: function(table) {
+        return {
+            _table: table,
+            _records: null,
+            
+            records: function(records) {
+                this._records = records;
+                return this;
+            },
+            
+            select: function() {
+                return this;
+            },
+            
+            single: async function() {
+                ensureDemoData();
+                const data = JSON.parse(localStorage.getItem(`demo_${this._table}`) || '[]');
+                const record = Array.isArray(this._records) ? this._records[0] : this._records;
+                
+                // Generate ID if not provided
+                if (!record.id) {
+                    record.id = `${this._table}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                }
+                
+                data.push(record);
+                localStorage.setItem(`demo_${this._table}`, JSON.stringify(data));
+                
+                return { data: record, error: null };
             }
         };
     }
+};
+
+// Wrap from() to support both syntaxes
+demoSupabase.from = function(table) {
+    return {
+        select: function(columns = '*') {
+            const queryBuilder = {
+                _table: table,
+                _columns: columns,
+                _filters: [],
+                _orderColumn: null,
+                _orderOptions: {},
+                _limitCount: null,
+                
+                eq: function(column, value) {
+                    this._filters.push({ column, operator: '=', value });
+                    return this;
+                },
+                
+                order: function(column, options = {}) {
+                    this._orderColumn = column;
+                    this._orderOptions = options;
+                    return this;
+                },
+                
+                limit: function(count) {
+                    this._limitCount = count;
+                    return this;
+                },
+                
+                single: async function() {
+                    const result = await this._execute();
+                    if (result.data && result.data.length > 0) {
+                        return { data: result.data[0], error: null };
+                    }
+                    return { data: null, error: { message: 'No rows found' } };
+                },
+                
+                then: function(callback) {
+                    return this._execute().then(callback);
+                },
+                
+                _execute: async function() {
+                    ensureDemoData();
+                    let data = JSON.parse(localStorage.getItem(`demo_${this._table}`) || '[]');
+                    
+                    // Apply filters
+                    this._filters.forEach(filter => {
+                        if (filter.operator === '=') {
+                            data = data.filter(row => row[filter.column] === filter.value);
+                        }
+                    });
+                    
+                    // Apply ordering
+                    if (this._orderColumn) {
+                        const column = this._orderColumn;
+                        const nullsFirst = this._orderOptions.nullsFirst !== false;
+                        
+                        data.sort((a, b) => {
+                            const aVal = a[column];
+                            const bVal = b[column];
+                            
+                            // Handle nulls
+                            if (aVal === null || aVal === undefined) return nullsFirst ? -1 : 1;
+                            if (bVal === null || bVal === undefined) return nullsFirst ? 1 : -1;
+                            
+                            // Compare values
+                            if (aVal < bVal) return -1;
+                            if (aVal > bVal) return 1;
+                            return 0;
+                        });
+                    }
+                    
+                    // Apply limit
+                    if (this._limitCount) {
+                        data = data.slice(0, this._limitCount);
+                    }
+                    
+                    return { data, error: null };
+                }
+            };
+            
+            return queryBuilder;
+        },
+        
+        insert: function(records) {
+            return {
+                select: function() {
+                    return this;
+                },
+                single: async function() {
+                    ensureDemoData();
+                    const data = JSON.parse(localStorage.getItem(`demo_${table}`) || '[]');
+                    const record = Array.isArray(records) ? records[0] : records;
+                    
+                    // Generate ID if not provided
+                    if (!record.id) {
+                        record.id = `${table}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    }
+                    
+                    data.push(record);
+                    localStorage.setItem(`demo_${table}`, JSON.stringify(data));
+                    
+                    return { data: record, error: null };
+                }
+            };
+        },
+        
+        update: function(updates) {
+            return {
+                eq: async function(column, value) {
+                    ensureDemoData();
+                    const data = JSON.parse(localStorage.getItem(`demo_${table}`) || '[]');
+                    const index = data.findIndex(row => row[column] === value);
+                    
+                    if (index !== -1) {
+                        data[index] = { ...data[index], ...updates };
+                        localStorage.setItem(`demo_${table}`, JSON.stringify(data));
+                        return { data: data[index], error: null };
+                    }
+                    
+                    return { data: null, error: { message: 'No rows found' } };
+                }
+            };
+        },
+        
+        delete: function() {
+            return {
+                eq: async function(column, value) {
+                    ensureDemoData();
+                    let data = JSON.parse(localStorage.getItem(`demo_${table}`) || '[]');
+                    data = data.filter(row => row[column] !== value);
+                    localStorage.setItem(`demo_${table}`, JSON.stringify(data));
+                    
+                    return { data: null, error: null };
+                }
+            };
+        }
+    };
 };
 
 // Make demo supabase available globally
