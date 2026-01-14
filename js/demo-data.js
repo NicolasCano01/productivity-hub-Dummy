@@ -309,4 +309,8 @@ const demoSupabase = {
 // Make demo supabase available globally
 if (typeof DEMO_MODE !== 'undefined' && DEMO_MODE) {
     window.supabaseClient = demoSupabase;
+    console.log('✅ Demo supabaseClient set on window:', typeof window.supabaseClient);
+    console.log('   - from() method available?', typeof window.supabaseClient.from === 'function');
+} else {
+    console.warn('⚠️ DEMO_MODE not enabled, skipping demo supabase setup');
 }
