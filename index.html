@@ -593,29 +593,38 @@ REPLACE THE ENTIRE GOAL MODAL (starts around line 384) WITH THIS:
         </div>
     </div>
  
-     <!-- Configuration - MUST BE FIRST -->
-        <script src="js/config.js"></script>
-        
-        <!-- Demo Data & localStorage Adapter - MUST BE SECOND -->
-        <script src="js/demo-data.js"></script>
-
-        <!-- 3. Supabase CDN (if using production mode) -->
-        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-        <!-- Chart.js for Analytics -->
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+     <!-- 1. Config FIRST -->
+    <script src="config.js"></script>
     
+    <!-- 2. Demo Data SECOND -->  
+    <script src="demo-data.js"></script>
     
-    <!-- JavaScript Modules -->
+    <!-- 3. Supabase CDN (optional, not needed for demo) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- 4. Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    
+    <!-- 5. Your app files -->
     <script src="js/state.js"></script>
     <script src="js/supabase.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/habits.js"></script>
     <script src="js/tasks.js"></script>
     <script src="js/goals.js"></script>
-    <script src="js/categories.js"></script>
     <script src="js/calendar.js"></script>
     <script src="js/analytics.js"></script>
+    <script src="js/categories.js"></script>
+    
+    <!-- 6. Diagnostic (temporary) -->
+    <script>
+    console.log('=== DIAGNOSTIC ===');
+    console.log('DEMO_MODE:', typeof DEMO_MODE !== 'undefined' ? DEMO_MODE : 'NOT DEFINED');
+    console.log('window.supabaseClient:', window.supabaseClient ? 'SET' : 'NULL');
+    console.log('==================');
+    </script>
+    
+    <!-- 7. App initialization LAST -->
     <script src="js/app.js"></script>
 </body>
 </html>
