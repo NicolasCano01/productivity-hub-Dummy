@@ -6,9 +6,10 @@
 async function initializeSupabase() {
     // Skip Supabase initialization if in demo mode
     if (typeof DEMO_MODE !== 'undefined' && DEMO_MODE) {
-        console.log('🎮 Demo mode enabled - skipping Supabase connection');
-        updateConnectionStatus(true);
-        return true;
+    console.log('🎮 Demo mode enabled - skipping Supabase connection');
+    supabaseClient = window.supabaseClient;  // <-- ADD THIS LINE
+    updateConnectionStatus(true);
+    return true;
     }
     
     try {
